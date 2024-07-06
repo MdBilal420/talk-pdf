@@ -13,7 +13,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from PyPDF2 import PdfReader
 
-# Input .txt file
+# Input a doc
 # Format file
 # Split file
 # Create embeddings
@@ -65,32 +65,71 @@ def generate_response(file,key,query):
     # run chain with query
     return retrieval_chain.run(query)
 
+def generate_store(file,key):
+     #format file
+    reader = PdfReader(file)
+    formatted_doc = []
+    for page in reader.pages:
+        formatted_doc.append(page.extract_text())
+    
+    # split file
+    text_splitter = RecursiveCharacterTextSplitter(
+        separators=["\n\n", "\n"], 
+        chunk_size=5000,
+        chunk_overlap=350
+    )
+    # text_splitter = CharacterTextSplitter(
+    #     chunk_size=1000,
+    #     chunk_overlap=0
+    # )
+    docs = text_splitter.create_documents(formatted_doc)
+
+    # create embeddings
+    embeddings = OpenAIEmbeddings(openai_api_key=key)
+
+    # load to vector database
+    # store = Chroma.from_documents(texts,embeddings)
+
+    store = FAISS.from_documents(docs,embeddings)
+
+    return store
+
+
+def get_query_response(openai_api_key,store,query):
+    #create retrieval chain
+    retrieval_chain = RetrievalQA.from_chain_type(
+        llm=OpenAI(temperature=0, openai_api_key=openai_api_key),
+        chain_type="stuff",
+        retriever=store.as_retriever()
+    )
+
+    # run chain with query
+    return retrieval_chain.run(query)
+
 with st.sidebar:
     openai_api_key = st.text_input(
         "OpenAI API Key:",
         type="password",
     )
 
-uploaded_file = st.file_uploader(
-    "Upload a .pdf document",
-    type="pdf"
-)
 
-query_text = st.text_input(
-    "Enter your question:",
-    placeholder="Write your question here",
-    disabled=not uploaded_file
-)
+
+
 
 result = []
+finalStore = []
 
 with st.form(
     "myform",
     clear_on_submit=True
 ):
+    uploaded_file = st.file_uploader(
+    "Upload a .pdf document",
+    type="pdf"
+)
     submitted = st.form_submit_button(
         "Submit",
-        disabled=not (uploaded_file and query_text and openai_api_key)
+        # disabled=not (uploaded_file and  openai_api_key)
     )
 
     if(not openai_api_key) :
@@ -98,9 +137,28 @@ with st.form(
     
     if submitted and openai_api_key.startswith("sk-"):
         with st.spinner("Wait, please. I am working on it..."):
-            response = generate_response(uploaded_file,openai_api_key,query_text)
-            result.append(response)
-            del openai_api_key
+            # response = generate_response(uploaded_file,openai_api_key,query_text)
+            # result.append(response)
+            # del openai_api_key
+            response = generate_store(uploaded_file,openai_api_key)
+            finalStore = response
+
+query_text = st.text_input(
+    "Enter your question:",
+    placeholder="Write your question here",
+    disabled=not uploaded_file
+)
+
+run_query = st.button(
+        "Run",
+        disabled=not (uploaded_file and  openai_api_key and query_text)
+    )
+
+if(run_query):
+    res = get_query_response(openai_api_key,finalStore,run_query)
+    result.append(res)
+    del openai_api_key
+
 
 if(len(result)):
     st.info(response)
