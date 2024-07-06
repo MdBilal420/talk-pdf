@@ -3,12 +3,10 @@
 # sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 
 import streamlit as st
-import chromadb
-import sqlite3
+
 from langchain_openai import OpenAI
 from langchain.chains import RetrievalQA
 from langchain.embeddings.openai import OpenAIEmbeddings
-from langchain.text_splitter import CharacterTextSplitter
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from PyPDF2 import PdfReader
@@ -28,7 +26,7 @@ st.set_page_config(
 st.title("Q&A from a Document")
 
 def generate_response(file,key,query):
-    
+
     #format file
     reader = PdfReader(file)
     formatted_doc = []
